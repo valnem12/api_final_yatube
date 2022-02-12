@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status, filters
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import mixins
 from django.shortcuts import get_object_or_404
 
 from posts.models import Post, Group
@@ -21,6 +22,7 @@ class PostViewSet(viewsets.ModelViewSet):
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
+    permission_classes = (AllowAny,)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -29,7 +31,7 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         post = get_object_or_404(Post, pk=self.kwargs.get('post_id'))
-        return post.comments
+        return post.comments.all()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -39,13 +41,16 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user,
-                        post_id=self.kwargs.get('post_id')
-                        )
+                        post_id=self.kwargs.get('post_id'))
 
 
-class FollowViewSet(viewsets.ModelViewSet):
-    serializer_class = FollowSerializer
+class CreateRetrieveViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet,
+                            mixins.ListModelMixin):
     permission_classes = (IsAuthenticated,)
+
+
+class FollowViewSet(CreateRetrieveViewSet):
+    serializer_class = FollowSerializer
     filter_backends = (filters.SearchFilter,)
     search_fields = ('=following__username',)
 
